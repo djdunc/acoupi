@@ -25,6 +25,8 @@ from acoupi.system.constants import Settings
 from acoupi.system.deployments import (
     end_deployment,
     get_current_deployment,
+    get_deployment_defaults,
+    save_deployment_defaults,
     start_deployment,
 )
 from acoupi.system.files import (
@@ -59,6 +61,8 @@ __all__ = [
     "dump_config",
     "enable_services",
     "end_deployment",
+    "get_deployment_defaults",
+    "save_deployment_defaults",
     "get_celery_app",
     "get_celery_status",
     "get_config_field",

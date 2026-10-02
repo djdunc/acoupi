@@ -102,3 +102,33 @@ def test_get_current_deployment_fails_if_ended(settings: Settings):
     deployments.end_deployment(settings)
     with pytest.raises(exceptions.DeploymentError):
         deployments.get_current_deployment(settings)
+
+
+def test_save_and_get_deployment_defaults(settings: Settings):
+    """Test saving and retrieving deployment defaults."""
+    # When no defaults exist
+    assert deployments.get_deployment_defaults(settings) == {}
+
+    # Save defaults
+    deployments.save_deployment_defaults(
+        settings, name="site-alpha", latitude=51.5, longitude=-0.12
+    )
+
+    defaults = deployments.get_deployment_defaults(settings)
+    assert defaults["name"] == "site-alpha"
+    assert defaults["latitude"] == 51.5
+    assert defaults["longitude"] == -0.12
+
+
+def test_get_deployment_defaults_fallback_to_deployment_file(settings: Settings):
+    """Test that get_deployment_defaults falls back to deployment.json if defaults file is absent."""
+    deployments.start_deployment(
+        settings, name="legacy-site", latitude=52.0, longitude=0.5
+    )
+    # Even if deployment ended
+    deployments.end_deployment(settings)
+
+    defaults = deployments.get_deployment_defaults(settings)
+    assert defaults["name"] == "legacy-site"
+    assert defaults["latitude"] == 52.0
+    assert defaults["longitude"] == 0.5
