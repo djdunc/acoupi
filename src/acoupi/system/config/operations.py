@@ -30,8 +30,13 @@ S = TypeVar("S", bound=BaseModel)
 
 
 def _unwrap_secrets(val: Any) -> Any:
+    from enum import Enum
     if isinstance(val, SecretStr):
         return val.get_secret_value()
+    if isinstance(val, Enum):
+        return val.value
+    if isinstance(val, Path):
+        return str(val)
     if isinstance(val, dict):
         return {k: _unwrap_secrets(v) for k, v in val.items()}
     if isinstance(val, list):
