@@ -39,12 +39,14 @@ def deployment(ctx):
     type=str,
     default=lambda: _get_deployment_default("name"),
     prompt="Enter the name of the deployment",
+    show_default=True,
 )
 @click.option(
     "--latitude",
     type=float,
     default=lambda: _get_deployment_default("latitude"),
     prompt="Enter the latitude of the deployment",
+    show_default=True,
     help="Latitude of the deployment",
 )
 @click.option(
@@ -52,6 +54,7 @@ def deployment(ctx):
     type=float,
     default=lambda: _get_deployment_default("longitude"),
     prompt="Enter the longitude of the deployment",
+    show_default=True,
 )
 @click.option(
     "--check/--no-check",
