@@ -22,6 +22,13 @@ def deployment(ctx):
         click.echo("Acoupi is not setup. Run `acoupi setup` first.")
         return
 
+    defaults = system.get_deployment_defaults(settings)
+    if defaults:
+        ctx.default_map = ctx.default_map or {}
+        start_defaults = ctx.default_map.setdefault("start", {})
+        for k, v in defaults.items():
+            start_defaults.setdefault(k, v)
+
 
 @deployment.command()
 @click.option(
@@ -55,6 +62,7 @@ def start(ctx, name, latitude, longitude, check):
 
     click.secho("Starting acoupi...", fg="green")
     system.start_program(settings, name, latitude, longitude)
+    system.save_deployment_defaults(settings, name, latitude, longitude)
     click.secho("Acoupi started.", fg="green")
 
 

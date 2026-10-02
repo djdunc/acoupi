@@ -4,17 +4,21 @@ This module contains utility functions for acoupi programs
 such as loading programs and getting celery apps from programs.
 """
 
+import datetime
+import json
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from acoupi import data
 from acoupi.system.constants import Settings
 from acoupi.system.exceptions import DeploymentError
 
 __all__ = [
-    "get_current_deployment",
-    "start_deployment",
     "end_deployment",
+    "get_current_deployment",
+    "get_deployment_defaults",
+    "save_deployment_defaults",
+    "start_deployment",
 ]
 
 
@@ -160,3 +164,73 @@ def load_deployment_from_file(path: Path) -> data.Deployment:
         If the deployment file does not exist.
     """
     return data.Deployment.model_validate_json(path.read_text())
+
+
+def get_deployment_defaults(settings: Settings) -> Dict[str, Any]:
+    """Get saved deployment defaults (name, latitude, longitude).
+
+    Checks the dedicated deployment_defaults_file first, and falls back to
+    reading the previous deployment_file if available.
+
+    Parameters
+    ----------
+    settings : Settings
+        The settings to use.
+
+    Returns
+    -------
+    Dict[str, Any]
+        Dictionary with saved 'name', 'latitude', and 'longitude' if present.
+    """
+    if hasattr(settings, "deployment_defaults_file") and settings.deployment_defaults_file.exists():
+        try:
+            with open(settings.deployment_defaults_file) as f:
+                data_dict = json.load(f)
+                return {k: v for k, v in data_dict.items() if v is not None}
+        except Exception:
+            pass
+
+    if settings.deployment_file.exists():
+        try:
+            dep = load_deployment_from_file(settings.deployment_file)
+            defaults = {"name": dep.name}
+            if dep.latitude is not None:
+                defaults["latitude"] = dep.latitude
+            if dep.longitude is not None:
+                defaults["longitude"] = dep.longitude
+            return defaults
+        except Exception:
+            pass
+
+    return {}
+
+
+def save_deployment_defaults(
+    settings: Settings,
+    name: str,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+) -> None:
+    """Save deployment defaults to file for future reuse.
+
+    Parameters
+    ----------
+    settings : Settings
+        The settings to use.
+    name : str
+        The name of the deployment.
+    latitude : Optional[float]
+        The latitude of the deployment.
+    longitude : Optional[float]
+        The longitude of the deployment.
+    """
+    path = getattr(
+        settings,
+        "deployment_defaults_file",
+        settings.home / "config" / "deployment_defaults.json",
+    )
+    if not path.parent.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+    payload = {"name": name, "latitude": latitude, "longitude": longitude}
+    path.write_text(json.dumps(payload, indent=4))
