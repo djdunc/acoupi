@@ -138,7 +138,8 @@ def parse_pydantic_model_field_from_args(
     """Parse a pydantic model field from the command line arguments."""
     model = get_field_dtype(field)
 
-    assert issubclass(model, BaseModel)
+    if not isinstance(model, type) or not issubclass(model, BaseModel):
+        raise ValueError(f"Field {field} is not a BaseModel class.")
 
     sub_defaults = None
     if isinstance(existing_defaults, dict):
@@ -185,7 +186,7 @@ def parse_pydantic_model_field_from_args(
     if model is None:
         raise ValueError(f"Field {field} has no annotation.")
 
-    if not issubclass(model, BaseModel):
+    if not isinstance(model, type) or not issubclass(model, BaseModel):
         raise ValueError(f"Field {field} is not a pydantic model.")
 
     values = {}
@@ -611,7 +612,7 @@ def parse_enum_field(
 
     field_enum = field.annotation
 
-    if not issubclass(field_enum, enum.Enum):  # type: ignore
+    if not isinstance(field_enum, type) or not issubclass(field_enum, enum.Enum):  # type: ignore
         raise ValueError(f"Field {field} is not an enum.")
 
     if not prompt:
