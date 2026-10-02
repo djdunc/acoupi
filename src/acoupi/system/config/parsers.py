@@ -5,7 +5,7 @@ import datetime
 import enum
 import re
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Callable, Literal, Dict, List, Optional, Type, TypeVar, Union
 
 import click
 from pydantic import BaseModel, SecretStr, ValidationError
@@ -88,10 +88,33 @@ def parse_field_from_args(
     existing_defaults: Optional[Dict[str, Any]] = None,
 ) -> object:
     """Parse a field from the command line arguments."""
+    annotation = field.annotation
+    if annotation is not None:
+        origin = get_origin(annotation)
+        if origin == Annotated:
+            annotation = get_args(annotation)[0]
+            origin = get_origin(annotation)
+        
+        import types
+        if origin in (Union, getattr(types, "UnionType", None)):
+            non_none = [a for a in get_args(annotation) if a is not type(None)]
+            if non_none:
+                origin = get_origin(non_none[0])
+
+        if origin is Literal:
+            return parse_literal_field(
+                field_name,
+                field,
+                args,
+                prompt=should_prompt(field, prompt=prompt),
+                prefix=prefix,
+                existing_defaults=existing_defaults,
+            )
+
     field_type = get_field_dtype(field)
 
     for dtype, _parse_argument in FIELD_PARSERS.items():
-        if issubclass(field_type, dtype):
+        if isinstance(field_type, type) and issubclass(field_type, dtype):
             return _parse_argument(
                 field_name,
                 field,
@@ -603,6 +626,69 @@ def parse_enum_field(
         type=click.Choice([m.value for m in field_enum], case_sensitive=False),
     )
     return field_enum(value)
+
+
+
+
+def parse_literal_field(
+    field_name: str,
+    field: FieldInfo,
+    args: List[str],
+    prompt: bool = True,
+    prefix: str = "",
+    existing_defaults: Optional[Dict[str, Any]] = None,
+) -> Any:
+    annotation = field.annotation
+    origin = get_origin(annotation)
+    if origin == Annotated:
+        annotation = get_args(annotation)[0]
+        origin = get_origin(annotation)
+    
+    import types
+    if origin in (Union, getattr(types, "UnionType", None)):
+        non_none = [a for a in get_args(annotation) if a is not type(None)]
+        if non_none:
+            annotation = non_none[0]
+
+    choices = [str(c) for c in get_args(annotation)]
+    cli_name = f"--{prefix}.{field_name}" if prefix else f"--{field_name}"
+    display_name = f"{prefix}.{field_name}" if prefix else field_name
+
+    parser = argparse.ArgumentParser()
+    default_val = get_field_default(field)
+    if default_val is None and isinstance(existing_defaults, dict):
+        default_val = existing_defaults.get(field_name)
+
+    parser.add_argument(
+        cli_name,
+        dest="value",
+        type=str,
+        default=default_val,
+        help=field.description,
+    )
+    parsed_args, _ = parser.parse_known_args(args)
+    value = parsed_args.value
+
+    if not prompt:
+        return value
+
+    if value is not None and str(value) in choices:
+        if click.confirm(
+            "Would you like to set "
+            f"{click.style(display_name, fg='blue', bold=True)}="
+            f"{click.style(repr(value), fg='yellow', bold=True)}?",
+            default=True,
+        ):
+            return value
+
+    return click.prompt(
+        (
+            "Please provide a value for "
+            f"{click.style(display_name, fg='blue', bold=True)}."
+        ),
+        type=click.Choice(choices, case_sensitive=False),
+        default=str(value) if (value is not None and str(value) in choices) else (choices[0] if choices else None),
+    )
 
 
 FIELD_PARSERS: Dict[type, FieldParser] = {
