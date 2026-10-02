@@ -63,12 +63,13 @@ def start(ctx, name, latitude, longitude, check):
     """Start acoupi."""
     settings = ctx.obj["settings"]
 
+    system.save_deployment_defaults(settings, name, latitude, longitude)
+
     if check:
         ctx.invoke(check_command)
 
     click.secho("Starting acoupi...", fg="green")
     system.start_program(settings, name, latitude, longitude)
-    system.save_deployment_defaults(settings, name, latitude, longitude)
     click.secho("Acoupi started.", fg="green")
 
 
