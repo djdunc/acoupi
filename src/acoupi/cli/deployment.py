@@ -1,6 +1,6 @@
 """CLI commands to manage acoupi deployment."""
 
-from typing import Dict, Literal, TypedDict
+from typing import Dict, Literal, Optional, TypedDict
 
 import click
 
@@ -8,9 +8,19 @@ from acoupi import system
 from acoupi.cli.base import acoupi
 from acoupi.cli.base import check as check_command
 from acoupi.system.celery import CeleryState, WorkerState
+from acoupi.system.constants import Settings
 from acoupi.system.programs import ProgramState
 from acoupi.system.services import ServiceStatus
 from acoupi.system.state import AcoupiStatus
+
+
+def _get_deployment_default(key: str) -> Optional[object]:
+    try:
+        settings = Settings()
+        defaults = system.get_deployment_defaults(settings)
+        return defaults.get(key)
+    except Exception:
+        return None
 
 
 @acoupi.group()
@@ -22,29 +32,25 @@ def deployment(ctx):
         click.echo("Acoupi is not setup. Run `acoupi setup` first.")
         return
 
-    defaults = system.get_deployment_defaults(settings)
-    if defaults:
-        ctx.default_map = ctx.default_map or {}
-        start_defaults = ctx.default_map.setdefault("start", {})
-        for k, v in defaults.items():
-            start_defaults.setdefault(k, v)
-
 
 @deployment.command()
 @click.option(
     "--name",
     type=str,
+    default=lambda: _get_deployment_default("name"),
     prompt="Enter the name of the deployment",
 )
 @click.option(
     "--latitude",
     type=float,
+    default=lambda: _get_deployment_default("latitude"),
     prompt="Enter the latitude of the deployment",
     help="Latitude of the deployment",
 )
 @click.option(
     "--longitude",
     type=float,
+    default=lambda: _get_deployment_default("longitude"),
     prompt="Enter the longitude of the deployment",
 )
 @click.option(
