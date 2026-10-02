@@ -170,7 +170,8 @@ def get_deployment_defaults(settings: Settings) -> Dict[str, Any]:
     """Get saved deployment defaults (name, latitude, longitude).
 
     Checks the dedicated deployment_defaults_file first, and falls back to
-    reading the previous deployment_file if available.
+    reading deployment.json, program_name_file (~/.acoupi/config/name), and
+    program.json (~/.acoupi/config/program.json).
 
     Parameters
     ----------
@@ -180,29 +181,66 @@ def get_deployment_defaults(settings: Settings) -> Dict[str, Any]:
     Returns
     -------
     Dict[str, Any]
-        Dictionary with saved 'name', 'latitude', and 'longitude' if present.
+        Dictionary with saved name, latitude, and longitude if present.
     """
-    if hasattr(settings, "deployment_defaults_file") and settings.deployment_defaults_file.exists():
+    defaults: Dict[str, Any] = {}
+
+    # 1. Fallback to program_name_file (~/.acoupi/config/name)
+    if hasattr(settings, "program_name_file") and settings.program_name_file.exists():
         try:
-            with open(settings.deployment_defaults_file) as f:
-                data_dict = json.load(f)
-                return {k: v for k, v in data_dict.items() if v is not None}
+            name_val = settings.program_name_file.read_text().strip()
+            if name_val:
+                defaults["name"] = name_val
         except Exception:
             pass
 
-    if settings.deployment_file.exists():
+    # 2. Fallback to program.json (~/.acoupi/config/program.json) for latitude/longitude
+    if hasattr(settings, "program_config_file") and settings.program_config_file.exists():
         try:
-            dep = load_deployment_from_file(settings.deployment_file)
-            defaults = {"name": dep.name}
-            if dep.latitude is not None:
-                defaults["latitude"] = dep.latitude
-            if dep.longitude is not None:
-                defaults["longitude"] = dep.longitude
-            return defaults
+            with open(settings.program_config_file) as f:
+                prog_data = json.load(f)
+                rec_cfg = prog_data.get("recording", {})
+                if rec_cfg.get("latitude") is not None:
+                    defaults["latitude"] = float(rec_cfg["latitude"])
+                if rec_cfg.get("longitude") is not None:
+                    defaults["longitude"] = float(rec_cfg["longitude"])
         except Exception:
             pass
 
-    return {}
+    # 3. Fallback to previous deployment.json
+    if hasattr(settings, "deployment_file") and settings.deployment_file.exists():
+        try:
+            with open(settings.deployment_file) as f:
+                dep_raw = json.load(f)
+                if dep_raw.get("name"):
+                    defaults["name"] = str(dep_raw["name"])
+                if dep_raw.get("latitude") is not None:
+                    defaults["latitude"] = float(dep_raw["latitude"])
+                if dep_raw.get("longitude") is not None:
+                    defaults["longitude"] = float(dep_raw["longitude"])
+        except Exception:
+            pass
+
+    # 4. Highest priority: explicit deployment_defaults.json
+    defaults_file = getattr(
+        settings,
+        "deployment_defaults_file",
+        settings.home / "config" / "deployment_defaults.json",
+    )
+    if defaults_file.exists():
+        try:
+            with open(defaults_file) as f:
+                saved_defaults = json.load(f)
+                if saved_defaults.get("name") is not None:
+                    defaults["name"] = str(saved_defaults["name"])
+                if saved_defaults.get("latitude") is not None:
+                    defaults["latitude"] = float(saved_defaults["latitude"])
+                if saved_defaults.get("longitude") is not None:
+                    defaults["longitude"] = float(saved_defaults["longitude"])
+        except Exception:
+            pass
+
+    return defaults
 
 
 def save_deployment_defaults(
